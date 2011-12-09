@@ -1105,9 +1105,9 @@ static __init int can_init(void)
 	dev_add_pack(&canfd_packet);
 
 	rtnl_af_register(&can_rtnl_af_ops);
-	rtnl_register(PF_CAN, RTM_NEWADDR, can_rtnl_doit, NULL);
-	rtnl_register(PF_CAN, RTM_DELADDR, can_rtnl_doit, NULL);
-	rtnl_register(PF_CAN, RTM_GETADDR, NULL, can_rtnl_dump_addr);
+	rtnl_register(PF_CAN, RTM_NEWADDR, can_rtnl_doit, NULL, NULL);
+	rtnl_register(PF_CAN, RTM_DELADDR, can_rtnl_doit, NULL, NULL);
+	rtnl_register(PF_CAN, RTM_GETADDR, NULL, can_rtnl_dump_addr, NULL);
 
 	return 0;
 }
