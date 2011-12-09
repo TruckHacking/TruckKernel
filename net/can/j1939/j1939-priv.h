@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/can/j1939.h>
 #include <linux/atomic.h>
+#include <linux/interrupt.h>
 
 /* TODO: return ENETRESET on busoff. */
 
