@@ -733,7 +733,7 @@ static int j1939sk_sendmsg(struct kiocb *iocb, struct socket *sock,
 	int ifindex;
 	int ret;
 
-	if (!(jsk->state | JSK_BOUND))
+	if (!(jsk->state & JSK_BOUND))
 		return -ENOTCONN;
 
 	if (msg->msg_name && (msg->msg_namelen <
