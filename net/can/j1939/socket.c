@@ -249,7 +249,6 @@ static int j1939sk_bind(struct socket *sock, struct sockaddr *uaddr, int len)
 {
 	struct sockaddr_can *addr = (struct sockaddr_can *)uaddr;
 	struct j1939_sock *jsk = j1939_sk(sock->sk);
-	struct j1939_ecu *ecu = NULL;
 	int ret, old_state;
 
 	if (len < required_size(can_addr.j1939, *addr))
@@ -298,20 +297,25 @@ static int j1939sk_bind(struct socket *sock, struct sockaddr *uaddr, int len)
 
 	/* bind name/addr */
 	if (addr->can_addr.j1939.name) {
+		struct j1939_ecu *ecu;
+
 		ecu = j1939_ecu_find_by_name(addr->can_addr.j1939.name,
 				jsk->sk.sk_bound_dev_if);
-		if (!ecu) {
+		if (!ecu || IS_ERR(ecu)) {
 			ret = -EADDRNOTAVAIL;
 			goto fail_locked;
 		} else if (ecu->flags & ECUFLAG_REMOTE) {
 			ret = -EREMOTE;
-			goto fail_with_ecu;
+			put_j1939_ecu(ecu);
+			goto fail_locked;
 		} else if (jsk->sk.sk_bound_dev_if != ecu->parent->ifindex) {
 			ret = -EHOSTUNREACH;
-			goto fail_with_ecu;
+			put_j1939_ecu(ecu);
+			goto fail_locked;
 		}
 		jsk->addr.src = ecu->name;
 		jsk->addr.sa = addr->can_addr.j1939.addr;
+		put_j1939_ecu(ecu);
 	} else if (j1939_address_is_unicast(addr->can_addr.j1939.addr)) {
 		struct j1939_segment *jseg;
 		struct addr_ent *paddr;
@@ -349,7 +353,7 @@ static int j1939sk_bind(struct socket *sock, struct sockaddr *uaddr, int len)
 		/* no name, no addr */
 	}
 
-	/* set default transmit pgn/priority */
+	/* set default transmit pgn */
 	jsk->addr.pgn = addr->can_addr.j1939.pgn;
 
 	old_state = jsk->state;
@@ -362,9 +366,6 @@ static int j1939sk_bind(struct socket *sock, struct sockaddr *uaddr, int len)
 
 	ret = 0;
 
-fail_with_ecu:
-	if (ecu && !IS_ERR(ecu))
-		put_j1939_ecu(ecu);
 fail_locked:
 	release_sock(sock->sk);
 	mutex_unlock(&s.lock);
