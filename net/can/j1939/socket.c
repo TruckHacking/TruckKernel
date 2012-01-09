@@ -245,6 +245,29 @@ fail_netdev:
 	return ret;
 }
 
+static int j1939sk_bind_addr_helper(int ifindex, uint8_t addr)
+{
+	struct j1939_segment *jseg;
+	struct addr_ent *paddr;
+	int flags;
+
+	/* static addressing, netdev is required */
+	if (!ifindex)
+		return -EINVAL;
+
+	jseg = j1939_segment_find(ifindex);
+	if (!jseg)
+		return -ENETUNREACH;
+	paddr = &jseg->ents[addr];
+	read_lock_bh(&jseg->lock);
+	flags = paddr->flags;
+	read_unlock_bh(&jseg->lock);
+	put_j1939_segment(jseg);
+	if (!(flags & ECUFLAG_LOCAL))
+		return -EADDRNOTAVAIL;
+	return 0;
+}
+
 static int j1939sk_bind(struct socket *sock, struct sockaddr *uaddr, int len)
 {
 	struct sockaddr_can *addr = (struct sockaddr_can *)uaddr;
@@ -264,18 +287,28 @@ static int j1939sk_bind(struct socket *sock, struct sockaddr *uaddr, int len)
 		if (addr->can_ifindex &&
 				(addr->can_ifindex != jsk->sk.sk_bound_dev_if))
 			goto fail_locked;
-		/*
-		 * do not allow to change addres after first bind(),
-		 * (it would require updating the j1939_ecu list)
-		 * but allow the change SA when using dynaddr,
-		 * and allow to change PGN
-		 */
-		if (!jsk->addr.src ||
-			(jsk->addr.src != addr->can_addr.j1939.name) ||
-			(jsk->addr.pgn != addr->can_addr.j1939.pgn))
+		if (jsk->addr.src &&
+				(jsk->addr.src == addr->can_addr.j1939.name)) {
+			/*
+			 * allow to change the address after the first bind()
+			 * when using dynamic addressing
+			 */
+			/* set to be able to send address claims */
+			jsk->addr.sa = addr->can_addr.j1939.addr;
+		} else if (jsk->addr.sa == addr->can_addr.j1939.addr) {
+			/* no change */
+		} else if (j1939_address_is_unicast(addr->can_addr.j1939.addr)) {
+			/* change of static source address */
+			ret = j1939sk_bind_addr_helper(jsk->sk.sk_bound_dev_if,
+					addr->can_addr.j1939.addr);
+			if (ret < 0)
+				goto fail_locked;
+			jsk->addr.sa = addr->can_addr.j1939.addr;
+		} else {
 			goto fail_locked;
-		/* set to be able to send address claims */
-		jsk->addr.sa = addr->can_addr.j1939.addr;
+		}
+		/* set default transmit pgn */
+		jsk->addr.pgn = addr->can_addr.j1939.pgn;
 		/* since this socket is bound already, we can skip a lot */
 		release_sock(sock->sk);
 		mutex_unlock(&s.lock);
@@ -317,30 +350,10 @@ static int j1939sk_bind(struct socket *sock, struct sockaddr *uaddr, int len)
 		jsk->addr.sa = addr->can_addr.j1939.addr;
 		put_j1939_ecu(ecu);
 	} else if (j1939_address_is_unicast(addr->can_addr.j1939.addr)) {
-		struct j1939_segment *jseg;
-		struct addr_ent *paddr;
-		int flags;
-
-		/* static addressing, netdev is required */
-		if (!jsk->sk.sk_bound_dev_if) {
-			ret = -EINVAL;
+		ret = j1939sk_bind_addr_helper(jsk->sk.sk_bound_dev_if,
+				addr->can_addr.j1939.addr);
+		if (ret < 0)
 			goto fail_locked;
-		}
-		jseg = j1939_segment_find(jsk->sk.sk_bound_dev_if);
-		if (!jseg) {
-			ret = -ENETUNREACH;
-			goto fail_locked;
-		}
-		paddr = &jseg->ents[addr->can_addr.j1939.addr];
-		ret = 0;
-		read_lock_bh(&jseg->lock);
-		flags = paddr->flags;
-		read_unlock_bh(&jseg->lock);
-		put_j1939_segment(jseg);
-		if (!(flags & ECUFLAG_LOCAL)) {
-			ret = -EADDRNOTAVAIL;
-			goto fail_locked;
-		}
 		jsk->addr.sa = addr->can_addr.j1939.addr;
 	} else if (addr->can_addr.j1939.addr == J1939_IDLE_ADDR) {
 		/* static addressing, netdev is required */
