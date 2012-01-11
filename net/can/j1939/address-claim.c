@@ -39,7 +39,7 @@ static inline int ac_msg_is_request_for_ac(struct sk_buff *skb)
 	if ((skb->len < 3) || (sk_addr->pgn != PGN_REQUEST))
 		return 0;
 	req_pgn = skb->data[0] | (skb->data[1] << 8) | (skb->data[2] << 16);
-	return req_pgn = PGN_ADDRESS_CLAIMED;
+	return req_pgn == PGN_ADDRESS_CLAIMED;
 }
 
 static int j1939_verify_outgoing_address_claim(struct sk_buff *skb)
