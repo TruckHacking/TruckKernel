@@ -726,6 +726,7 @@ static int j1939sk_recvmsg(struct kiocb *iocb, struct socket *sock,
 		paddr->can_addr.j1939.pgn = sk_addr->pgn;
 	}
 
+	msg->msg_flags |= sk_addr->msg_flags;
 	skb_free_datagram(sk, skb);
 
 	return size;
