@@ -114,7 +114,6 @@ int j1939rtnl_new_addr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	if (tb[IFA_J1939_NAME])
 		jname = be64_to_cpu(nla_get_u64(tb[IFA_J1939_NAME]));
 
-
 	ret = 0;
 	if (j1939_address_is_unicast(jaddr)) {
 		ent = &jseg->ents[jaddr];
@@ -160,16 +159,17 @@ static int j1939rtnl_fill_ifaddr(struct sk_buff *skb, int ifindex,
 
 	nla = nla_nest_start(skb, IFA_LOCAL);
 	if (j1939_address_is_unicast(addr))
-		NLA_PUT_U8(skb, IFA_J1939_ADDR, addr);
+		if (nla_put_u8(skb, IFA_J1939_ADDR, addr) < 0)
+			goto nla_failure;
 	if (name)
-		NLA_PUT_U64(skb, IFA_J1939_NAME, cpu_to_be64(name));
+		if (nla_put_u64(skb, IFA_J1939_NAME, cpu_to_be64(name)) < 0)
+			goto nla_failure;
 	nla_nest_end(skb, nla);
 
 	return nlmsg_end(skb, nlh);
-
-nla_put_failure:
-	nlmsg_cancel(skb, nlh);
-	return -EMSGSIZE;
+nla_failure:
+       nlmsg_cancel(skb, nlh);
+       return -EMSGSIZE;
 }
 
 int j1939rtnl_dump_addr(struct sk_buff *skb, struct netlink_callback *cb)
@@ -271,11 +271,9 @@ static int j1939_fill_link_af(struct sk_buff *skb, const struct net_device *dev)
 	jseg = j1939_segment_find(dev->ifindex);
 	if (jseg)
 		put_j1939_segment(jseg);
-	NLA_PUT_U8(skb, IFLA_J1939_ENABLE, jseg ? 1 : 0);
+	if (nla_put_u8(skb, IFLA_J1939_ENABLE, jseg ? 1 : 0) < 0)
+		return -EMSGSIZE;
 	return 0;
-
-nla_put_failure:
-	return -EMSGSIZE;
 }
 
 static int j1939_set_link_af(struct net_device *dev, const struct nlattr *nla)
