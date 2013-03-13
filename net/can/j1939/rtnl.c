@@ -140,13 +140,13 @@ int j1939rtnl_new_addr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 
 static int j1939rtnl_fill_ifaddr(struct sk_buff *skb, int ifindex,
 		uint8_t addr, uint64_t name, int j1939_flags,
-		u32 pid, u32 seq, int event, unsigned int flags)
+		u32 portid, u32 seq, int event, unsigned int flags)
 {
 	struct ifaddrmsg *ifm;
 	struct nlmsghdr *nlh;
 	struct nlattr *nla;
 
-	nlh = nlmsg_put(skb, pid, seq, event, sizeof(*ifm), flags);
+	nlh = nlmsg_put(skb, portid, seq, event, sizeof(*ifm), flags);
 	if (nlh == NULL)
 		return -EMSGSIZE;
 
@@ -201,7 +201,7 @@ int j1939rtnl_dump_addr(struct sk_buff *skb, struct netlink_callback *cb)
 			if (!(ent->flags & ECUFLAG_LOCAL))
 				continue;
 			ret = j1939rtnl_fill_ifaddr(skb, netdev->ifindex, addr,
-					0, ent->flags, NETLINK_CB(cb->skb).pid,
+					0, ent->flags, NETLINK_CB(cb->skb).portid,
 					cb->nlh->nlmsg_seq, RTM_NEWADDR,
 					NLM_F_MULTI);
 			if (ret < 0) {
@@ -223,7 +223,7 @@ int j1939rtnl_dump_addr(struct sk_buff *skb, struct netlink_callback *cb)
 				sa = J1939_IDLE_ADDR;
 			ret = j1939rtnl_fill_ifaddr(skb, netdev->ifindex,
 					sa, ecu->name, ecu->flags,
-					NETLINK_CB(cb->skb).pid,
+					NETLINK_CB(cb->skb).portid,
 					cb->nlh->nlmsg_seq, RTM_NEWADDR,
 					NLM_F_MULTI);
 			if (ret < 0) {
