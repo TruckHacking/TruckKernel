@@ -1035,7 +1035,8 @@ static int can_validate_link_af(const struct net_device *dev,
 			ret = 0;
 		else
 			ret = cp->rtnl_link_ops->validate_link_af(dev, prot);
-		can_put_proto(cp);
+		if (cp)
+			can_put_proto(cp);
 		if (ret < 0)
 			return ret;
 	}
@@ -1058,7 +1059,8 @@ static int can_set_link_af(struct net_device *dev, const struct nlattr *nla)
 			ret = -EPROTONOSUPPORT;
 		else
 			ret = cp->rtnl_link_ops->set_link_af(dev, prot);
-		can_put_proto(cp);
+		if (cp)
+			can_put_proto(cp);
 		if (ret < 0)
 			return ret;
 	}
